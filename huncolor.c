@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
+#include <sys/stat.h>
 
 #include <hunspell.h>
 
@@ -169,6 +170,13 @@ static void exec_less(char **argv)
 	exit(1);
 }
 
+static void local_dictionary(Hunhandle *handle, const char *filename)
+{
+	struct stat st;
+	if (!stat(filename, &st) && S_ISREG(st.st_mode))
+		Hunspell_add_dic(handle, filename);
+}
+
 #define BUFSIZE 1024
 
 int main(int argc, char **argv)
@@ -183,6 +191,14 @@ int main(int argc, char **argv)
 
 	if (!hunhandle || pipe(fd))
 		exec_less(argv);
+
+	// Add local dictionaries from cwd and $HOME
+	local_dictionary(hunhandle, ".dictionary");
+	char *home = getenv("HOME");
+	if (home) {
+		snprintf(buf, BUFSIZE, "%s/.dictionary", home);
+		local_dictionary(hunhandle, buf);
+	}
 
 	if (fork()) {
 		dup2(fd[0], 0);
